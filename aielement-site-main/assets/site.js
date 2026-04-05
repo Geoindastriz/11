@@ -3,10 +3,10 @@
   var DESKTOP_BREAKPOINT = 1024;
   var DEFAULT_CONFIG = {
     contact: {
-      telegramUrl: "https://t.me/Ai_Element_Bot",
-      whatsappUrl: "https://wa.me/79990000000",
-      phone: "+79990000000",
-      email: "hello@example.com"
+      telegramUrl: "https://t.me/TBouDpyr",
+      whatsappUrl: "https://wa.me/79785900878",
+      phone: "+79785900878",
+      email: "aielement@bezcms.ru.com"
     },
     leadForm: {
       endpoint: "/api/lead",
