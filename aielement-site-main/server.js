@@ -66,17 +66,18 @@ function validateLead(input) {
     contact: sanitizeText(input.contact, 200),
     message: sanitizeText(input.message, 2000),
     page: sanitizeText(input.page, 120),
+    source: sanitizeText(input.source, 500),
     timestamp: new Date().toISOString()
   };
 
-  if (!lead.name) {
-    return { ok: false, message: "Name is required." };
+  if (!lead.message || lead.message.length < 5) {
+    return { ok: false, errorCode: "validation_message_required" };
   }
   if (!lead.contact || lead.contact.length < 4) {
-    return { ok: false, message: "A valid contact method is required." };
+    return { ok: false, errorCode: "validation_contact_required" };
   }
   if (!/[@+\dA-Za-z]/.test(lead.contact)) {
-    return { ok: false, message: "Contact details look invalid." };
+    return { ok: false, errorCode: "validation_contact_invalid" };
   }
   if (!lead.page) {
     lead.page = "unknown";
@@ -126,16 +127,13 @@ async function forwardLeadToGoogleSheets(lead, ip) {
   }
 }
 
-function buildTelegramMessage(lead, ip) {
+function buildTelegramMessage(lead) {
   return [
-    "<b>New lead from AiElement</b>",
-    "",
-    `<b>Name:</b> ${escapeTelegram(lead.name)}`,
-    `<b>Contact:</b> ${escapeTelegram(lead.contact)}`,
-    `<b>Message:</b> ${escapeTelegram(lead.message || "—")}`,
-    `<b>Page:</b> ${escapeTelegram(lead.page)}`,
-    `<b>Timestamp:</b> ${escapeTelegram(lead.timestamp)}`,
-    `<b>IP:</b> <code>${escapeTelegram(ip)}</code>`
+    "<b>\u041d\u043e\u0432\u0430\u044f \u0437\u0430\u044f\u0432\u043a\u0430</b>",
+    `<b>\u0418\u0434\u0435\u044f:</b> ${escapeTelegram(lead.message)}`,
+    `<b>\u0418\u043c\u044f:</b> ${escapeTelegram(lead.name || "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e")}`,
+    `<b>\u041a\u043e\u043d\u0442\u0430\u043a\u0442:</b> ${escapeTelegram(lead.contact)}`,
+    `<b>\u0421\u0442\u0440\u0430\u043d\u0438\u0446\u0430:</b> ${escapeTelegram(lead.source || lead.page || "unknown")}`
   ].join("\n");
 }
 
@@ -158,7 +156,7 @@ async function sendLeadToTelegram(lead, ip) {
     },
     body: JSON.stringify({
       chat_id: TELEGRAM_CHAT_ID,
-      text: buildTelegramMessage(lead, ip),
+      text: buildTelegramMessage(lead),
       parse_mode: "HTML",
       disable_web_page_preview: true
     })
@@ -197,7 +195,7 @@ async function handleLeadRequest(req, res) {
   if (isRateLimited(ip)) {
     return json(res, 429, {
       ok: false,
-      error: "Too many requests. Please wait a few minutes and try again."
+      errorCode: "rate_limited"
     });
   }
 
@@ -205,7 +203,7 @@ async function handleLeadRequest(req, res) {
   try {
     body = await readJsonBody(req);
   } catch (error) {
-    return json(res, 400, { ok: false, error: error.message });
+    return json(res, 400, { ok: false, errorCode: "request_failed" });
   }
 
   if (body && typeof body.website === "string" && body.website.trim()) {
@@ -214,7 +212,7 @@ async function handleLeadRequest(req, res) {
 
   const validation = validateLead(body || {});
   if (!validation.ok) {
-    return json(res, 400, { ok: false, error: validation.message });
+    return json(res, 400, { ok: false, errorCode: validation.errorCode || "request_failed" });
   }
 
   try {
@@ -227,7 +225,7 @@ async function handleLeadRequest(req, res) {
     console.error("Lead delivery error:", error);
     return json(res, 502, {
       ok: false,
-      error: "Lead delivery failed. Please try again later."
+      errorCode: "delivery_failed"
     });
   }
 
